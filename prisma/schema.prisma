@@ -1,0 +1,189 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(cuid())
+  email      String      @unique
+  name       String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  portfolios Portfolio[]
+  apiKeys    ApiKey[]
+  
+  @@map("users")
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  exchange  String   // "binance", "coinbase", etc
+  apiKey    String
+  secretKey String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, exchange])
+  @@map("api_keys")
+}
+
+model Portfolio {
+  id           String    @id @default(cuid())
+  userId       String
+  name         String
+  totalValue   Float     @default(0)
+  currency     String    @default("USD")
+  isActive     Boolean   @default(true)
+  riskLevel    String    @default("MEDIUM") // LOW, MEDIUM, HIGH
+  targetReturn Float?    @default(0.15) // 15% annual target
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings     Holding[]
+  trades       Trade[]
+  rebalances   Rebalance[]
+  
+  @@map("portfolios")
+}
+
+model Holding {
+  id           String    @id @default(cuid())
+  portfolioId  String
+  symbol       String    // BTC, ETH, etc
+  amount       Float     // Quantity held
+  avgPrice     Float     // Average purchase price
+  currentPrice Float?    // Latest market price
+  valueUSD     Float?    // Current value in USD
+  percentage   Float?    // Percentage of portfolio
+  updatedAt    DateTime  @updatedAt
+  
+  portfolio    Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  @@unique([portfolioId, symbol])
+  @@map("holdings")
+}
+
+model Trade {
+  id          String   @id @default(cuid())
+  portfolioId String
+  symbol      String   // BTC, ETH, etc
+  side        String   // BUY, SELL
+  quantity    Float    // Amount traded
+  price       Float    // Execution price
+  value       Float    // Total value (quantity * price)
+  fee         Float?   // Transaction fee
+  status      String   // PENDING, EXECUTED, FAILED, CANCELLED
+  exchange    String?  // binance, coinbase, etc
+  orderId     String?  // Exchange order ID
+  reason      String?  // AI reason for trade
+  timestamp   DateTime @default(now())
+  
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  @@index([portfolioId, timestamp])
+  @@index([symbol, timestamp])
+  @@map("trades")
+}
+
+model MarketData {
+  id        String   @id @default(cuid())
+  symbol    String   // BTC, ETH, etc
+  price     Float    // Current price
+  volume    Float    // 24h volume
+  high24h   Float    // 24h high
+  low24h    Float    // 24h low
+  change24h Float    // 24h change percentage
+  marketCap Float?   // Market cap
+  supply    Float?   // Circulating supply
+  timestamp DateTime @default(now())
+  
+  @@index([symbol, timestamp])
+  @@index([timestamp])
+  @@map("market_data")
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  symbol    String
+  timeframe String   // 1m, 5m, 15m, 1h, 4h, 1d
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float
+  timestamp DateTime
+  
+  @@unique([symbol, timeframe, timestamp])
+  @@index([symbol, timeframe, timestamp])
+  @@map("price_history")
+}
+
+model TechnicalIndicator {
+  id        String   @id @default(cuid())
+  symbol    String
+  indicator String   // RSI, MACD, SMA, etc
+  timeframe String   // 1h, 4h, 1d
+  value     Float
+  signal    String?  // BUY, SELL, NEUTRAL
+  timestamp DateTime @default(now())
+  
+  @@index([symbol, indicator, timeframe, timestamp])
+  @@map("technical_indicators")
+}
+
+model NewsData {
+  id          String   @id @default(cuid())
+  title       String
+  content     String?
+  url         String   @unique
+  source      String
+  sentiment   Float?   // -1 to 1
+  relevance   Float?   // 0 to 1
+  symbols     String[] // Related symbols
+  publishedAt DateTime
+  createdAt   DateTime @default(now())
+  
+  @@index([publishedAt])
+  @@index([sentiment])
+  @@map("news_data")
+}
+
+model Rebalance {
+  id            String   @id @default(cuid())
+  portfolioId   String
+  reason        String   // AI reason for rebalancing
+  status        String   // PENDING, EXECUTING, COMPLETED, FAILED
+  totalCost     Float?   // Total rebalancing cost
+  expectedGain  Float?   // Expected benefit
+  trades        Json     // Array of trades to execute
+  executedAt    DateTime?
+  createdAt     DateTime @default(now())
+  
+  portfolio     Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  @@index([portfolioId, createdAt])
+  @@map("rebalances")
+}
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String   // INFO, WARN, ERROR, DEBUG
+  message   String
+  component String   // market-data, trading, ai-agent, etc
+  data      Json?    // Additional log data
+  timestamp DateTime @default(now())
+  
+  @@index([level, timestamp])
+  @@index([component, timestamp])
+  @@map("system_logs")
+}

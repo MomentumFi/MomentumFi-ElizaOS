@@ -24,9 +24,10 @@ describe("Data Ingestion Pipeline", () => {
 
     expect(data).toBeDefined();
     expect(data.length).toBeGreaterThan(0);
-    expect(data[0].symbol).toBe("BTC");
-    expect(data[0].timeframe).toBe("1d");
-    expect(data[0].open).toBeGreaterThan(0);
+    expect(data[0]).toBeDefined();
+    expect(data[0]?.symbol).toBe("BTC");
+    expect(data[0]?.timeframe).toBe("1d");
+    expect(data[0]?.open).toBeGreaterThan(0);
   }, 10000);
 
   test("should start market data stream", async () => {
